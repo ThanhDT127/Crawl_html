@@ -10,8 +10,30 @@ import json
 import re
 import pyodbc
 import mysql.connector
+from sphinx.testing.path import path
 
+category_urls = {
+    "Bóng đá": "https://www.24h.com.vn/bong-da-c48.html",
+    "Thế giới": "https://www.24h.com.vn/tin-tuc-quoc-te-c415.html",
+    "Pháp luật": "https://www.24h.com.vn/an-ninh-hinh-su-c51.html",
+    "Kinh doanh": "https://www.24h.com.vn/kinh-doanh-c161.html",
+    "Đàn ông": "https://www.24h.com.vn/dan-ong-c1038.html",
+    "Làm đẹp": "https://www.24h.com.vn/lam-dep-c145.html",
+    "Đời sống Showbiz": "https://www.24h.com.vn/doi-song-showbiz-c729.html",
+    "Thời trang Hi-tech": "https://www.24h.com.vn/thoi-trang-hi-tech-c407.html",
+    "Ẩm thực": "https://www.24h.com.vn/am-thuc-c460.html",
+    "Xe máy - xe đạp": "https://www.24h.com.vn/xe-may-xe-dap-c748.html",
+    "Công nghệ thông tin": "https://www.24h.com.vn/cong-nghe-thong-tin-c55.html",
+    "Du lịch": "https://www.24h.com.vn/du-lich-24h-c76.html"
+}
 
+category_urls_2 = {
+    "Thời trang Hi-tech": "https://www.24h.com.vn/thoi-trang-hi-tech-c407.html",
+    "Ẩm thực": "https://www.24h.com.vn/am-thuc-c460.html",
+    "Xe máy - xe đạp": "https://www.24h.com.vn/xe-may-xe-dap-c748.html",
+    "Công nghệ thông tin": "https://www.24h.com.vn/cong-nghe-thong-tin-c55.html",
+    "Du lịch": "https://www.24h.com.vn/du-lich-24h-c76.html"
+}
 def check_none(element):
     if element is not None:
         return element.get_text().strip()
@@ -26,13 +48,14 @@ def save_data(data):
         database="mydatabase"
     )
     mycursor = mydb.cursor()
-    sql = "INSERT INTO Crawl (title,content,time,author,img_url) VALUES (%s,%s,%s,%s,%s)"
+    sql = "INSERT INTO Crawl (title,content,time,author,img_url,type) VALUES (%s,%s,%s,%s,%s,%s)"
     values = (
         data["Tên bài báo: "],
         data["Nội dung: "],
         data["Thời gian đăng bài: "],
         data["Tác giả:"],
-        data["URl-image:"]
+        data["URl-image:"],
+        data["Type:"]
     )
     # mycursor.execute("ALTER TABLE Crawl MODIFY COLUMN time VARCHAR(255);")
     mycursor.execute(sql, values)
@@ -40,7 +63,7 @@ def save_data(data):
     mycursor.close()
     mydb.close()
 
-def Parser_html(url):
+def Parser_html(url,category):
     # truy cập vào url
     try:
         req = requests.get(url)
@@ -59,12 +82,16 @@ def Parser_html(url):
         content_details = check_none(strong_element)
 
     author_div = soup.find("div", class_="nguontin nguontinD bld mrT10 mrB10 fr flex-1 text-right margin-left-10")
+    if author_div is None:
+        author_div = soup.find("div", class_="nguontin nguontinD")
     author = check_none(author_div)
     if author is not None:
         author = author.replace("Theo", "").strip()
 
-    img_tags = soup.find("div", {"id": "container-24h-banner-in-image"})
+    img_tags = soup.find("article", {"class": "cate-24h-foot-arti-deta-info"})
     img_url = None
+    if img_tags is None:
+        img_tags = soup.find("section", {"class": "cate-24h-foot-main"})
     if img_tags is not None and img_tags.find("img", src=True) is not None:
         img_url = img_tags.find("img", src=True)["src"]
 
@@ -73,37 +100,13 @@ def Parser_html(url):
         "Nội dung: ": content_details,
         "Thời gian đăng bài: ": time,
         "Tác giả:": author,
-        "URl-image:": img_url
+        "URl-image:": img_url,
+        "Type:":category
     }
     return Json
 
 
-def Cralw_html():
-    category_urls = {
-        "Bóng đá": "https://www.24h.com.vn/bong-da-c48.html",
-        "Thế giới": "https://www.24h.com.vn/tin-tuc-quoc-te-c415.html",
-        "Pháp luật": "https://www.24h.com.vn/an-ninh-hinh-su-c51.html",
-        "Kinh doanh": "https://www.24h.com.vn/kinh-doanh-c161.html",
-        "Đàn ông": "https://www.24h.com.vn/dan-ong-c1038.html",
-        "Làm đẹp": "https://www.24h.com.vn/lam-dep-c145.html",
-        "Đời sống Showbiz": "https://www.24h.com.vn/doi-song-showbiz-c729.html",
-        "Thời trang Hi-tech": "https://www.24h.com.vn/thoi-trang-hi-tech-c407.html",
-        "Ẩm thực": "https://www.24h.com.vn/am-thuc-c460.html",
-        "Xe máy - xe đạp": "https://www.24h.com.vn/xe-may-xe-dap-c748.html",
-        "Công nghệ thông tin": "https://www.24h.com.vn/cong-nghe-thong-tin-c55.html",
-        "Du lịch": "https://www.24h.com.vn/du-lich-24h-c76.html"
-    }
-
-    category_urls_2 = {
-        "Thời trang Hi-tech": "https://www.24h.com.vn/thoi-trang-hi-tech-c407.html",
-        "Ẩm thực": "https://www.24h.com.vn/am-thuc-c460.html",
-        "Xe máy - xe đạp": "https://www.24h.com.vn/xe-may-xe-dap-c748.html",
-        "Công nghệ thông tin": "https://www.24h.com.vn/cong-nghe-thong-tin-c55.html",
-        "Du lịch": "https://www.24h.com.vn/du-lich-24h-c76.html"
-    }
-
-    for category, url in category_urls.items():
-        print(category)
+def Cralw_html(category,url,count,set_data):
         try:
             req = requests.get(url)
             soup = BeautifulSoup(req.text, "html.parser")
@@ -118,14 +121,18 @@ def Cralw_html():
         for link in url_web:
             div_sec = link.find("div", {"class": "row"})
             div_element = link.find_all("a", href=True, limit=10)
-            count = 0
+
             for links in div_element:
                 href_value = links['href']
                 if href_value not in seen_links:
                     count += 1
                     seen_links.add(href_value)
-                    data_json = Parser_html(href_value)
-                    save_data(data_json)
+                    data_json = Parser_html(href_value,category)
+                    if data_json["Tên bài báo: "] not in [item[0] for item in set_data]:
+                        print("chưa có file trong cơ sở dữ liệu")
+                        save_data(data_json)
+                    else:
+                        print("đã có file trong cơ sở dữ liệu")
                     # lưu vào file json
                     try:
                         file = category + str(count) + ".json"
@@ -135,13 +142,33 @@ def Cralw_html():
                     except json.JSONDecodeError as e:
                         print("Lỗi lưu vào file json.")
 
-
+def get_data_save(category):
+    mydb = mysql.connector.connect(
+        host="127.0.0.1",
+        user="root",
+        password="12345678",
+        database="mydatabase"
+    )
+    mycursor = mydb.cursor()
+    sql = "SELECT title FROM crawl WHERE type = %s"
+    par = (category,)
+    # mycursor.execute("ALTER TABLE Crawl MODIFY COLUMN time VARCHAR(255);")
+    mycursor.execute(sql,par)
+    tables = set(row for row in mycursor.fetchall())
+    mydb.commit()
+    mycursor.close()
+    mydb.close()
+    return tables
 def main():
-    # time_duration_minutes = 10
-    # time_duration_seconds = time_duration_minutes * 60
-    # while True:
-        Cralw_html()
-        # time.sleep(time_duration_seconds)
+    time_duration_minutes = 10
+    time_duration_seconds = time_duration_minutes * 60
+    while True:
+        for category, url in category_urls.items():
+            set_data = get_data_save(category);
+            count = 0
+            print(set_data)
+            Cralw_html(category,url,count,set_data)
+            time.sleep(time_duration_seconds)
 
 
 if __name__ == "__main__":
