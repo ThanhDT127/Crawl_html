@@ -26,13 +26,14 @@ def save_data(data):
         database="mydatabase"
     )
     mycursor = mydb.cursor()
-    sql = "INSERT INTO Crawl (title,content,time,author,img_url) VALUES (%s,%s,%s,%s,%s)"
+    sql = "INSERT INTO Crawl (title,content,time,author,img_url,type) VALUES (%s,%s,%s,%s,%s,%s)"
     values = (
         data["Tên bài báo: "],
         data["Nội dung: "],
         data["Thời gian đăng bài: "],
         data["Tác giả:"],
-        data["URl-image:"]
+        data["URl-image:"],
+        data["Type:"]
     )
     # mycursor.execute("ALTER TABLE Crawl MODIFY COLUMN time VARCHAR(255);")
     mycursor.execute(sql, values)
@@ -40,7 +41,7 @@ def save_data(data):
     mycursor.close()
     mydb.close()
 
-def Parser_html(url):
+def Parser_html(url,category):
     # truy cập vào url
     try:
         req = requests.get(url)
@@ -59,21 +60,27 @@ def Parser_html(url):
         content_details = check_none(strong_element)
 
     author_div = soup.find("div", class_="nguontin nguontinD bld mrT10 mrB10 fr flex-1 text-right margin-left-10")
+    if author_div is None:
+        author_div = soup.find("div", class_="nguontin nguontinD")
     author = check_none(author_div)
     if author is not None:
         author = author.replace("Theo", "").strip()
 
-    img_tags = soup.find("div", {"id": "container-24h-banner-in-image"})
+    img_tags = soup.find("article", {"class": "cate-24h-foot-arti-deta-info"})
     img_url = None
+    if img_tags is None:
+        img_tags = soup.find("section", {"class": "cate-24h-foot-main"})
     if img_tags is not None and img_tags.find("img", src=True) is not None:
         img_url = img_tags.find("img", src=True)["src"]
+        print(img_url)
 
     Json = {
         "Tên bài báo: ": title,
         "Nội dung: ": content_details,
         "Thời gian đăng bài: ": time,
         "Tác giả:": author,
-        "URl-image:": img_url
+        "URl-image:": img_url,
+        "Type:":category
     }
     return Json
 
@@ -124,7 +131,7 @@ def Cralw_html():
                 if href_value not in seen_links:
                     count += 1
                     seen_links.add(href_value)
-                    data_json = Parser_html(href_value)
+                    data_json = Parser_html(href_value,category)
                     save_data(data_json)
                     # lưu vào file json
                     try:
