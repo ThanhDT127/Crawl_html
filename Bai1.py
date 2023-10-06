@@ -34,6 +34,8 @@ category_urls_2 = {
     "Công nghệ thông tin": "https://www.24h.com.vn/cong-nghe-thong-tin-c55.html",
     "Du lịch": "https://www.24h.com.vn/du-lich-24h-c76.html"
 }
+
+
 def check_none(element):
     if element is not None:
         return element.get_text().strip()
@@ -63,7 +65,8 @@ def save_data(data):
     mycursor.close()
     mydb.close()
 
-def Parser_html(url,category):
+
+def Parser_html(url, category):
     # truy cập vào url
     try:
         req = requests.get(url)
@@ -73,13 +76,20 @@ def Parser_html(url,category):
 
     # lấy nội dung
     title = soup.title.string
-    content = soup.find("div", id="left")
-    time = content.find("time")
-    time = check_none(time)
+    content = soup.find("article", {"class": "cate-24h-foot-arti-deta-info"})
+    time = soup.find("div", {"id": "left"})
+    time_details = time.find("time")
+    time = check_none(time_details)
 
+    content_details = ""
     if content is not None:
-        strong_element = content.find("strong")
-        content_details = check_none(strong_element)
+        div_p = content.find_all("p")
+        for p in div_p:
+            if "linkOrgin" in content.get("class", []):
+                continue
+            if p in content.find_all("div", {"ct-bv"}):
+                continue
+            content_details += " " + check_none(p).replace("\n", " ").strip()
 
     author_div = soup.find("div", class_="nguontin nguontinD bld mrT10 mrB10 fr flex-1 text-right margin-left-10")
     if author_div is None:
@@ -101,46 +111,47 @@ def Parser_html(url,category):
         "Thời gian đăng bài: ": time,
         "Tác giả:": author,
         "URl-image:": img_url,
-        "Type:":category
+        "Type:": category
     }
     return Json
 
 
-def Cralw_html(category,url,count,set_data):
-        try:
-            req = requests.get(url)
-            soup = BeautifulSoup(req.text, "html.parser")
-        except:
-            print("lỗi kết nối đến url", req)
-        url_web = soup.find_all("section", {"class": "cate-24h-foot-box-news-hightl box-news-hightl-ftb"})
-        if category in category_urls_2:
-            url_web = soup.find_all("div", {
-                "class": "cate-24h-foot-box-live-news-hightl cate-24h-car-news-hightl margin-top-10"})
-        seen_links = set()
-        # truy cập vào từng link
-        for link in url_web:
-            div_sec = link.find("div", {"class": "row"})
-            div_element = link.find_all("a", href=True, limit=10)
+def Cralw_html(category, url, count, set_data):
+    try:
+        req = requests.get(url)
+        soup = BeautifulSoup(req.text, "html.parser")
+    except:
+        print("lỗi kết nối đến url", req)
+    url_web = soup.find_all("section", {"class": "cate-24h-foot-box-news-hightl box-news-hightl-ftb"})
+    if category in category_urls_2:
+        url_web = soup.find_all("div", {
+            "class": "cate-24h-foot-box-live-news-hightl cate-24h-car-news-hightl margin-top-10"})
+    seen_links = set()
+    # truy cập vào từng link
+    for link in url_web:
+        div_sec = link.find("div", {"class": "row"})
+        div_element = link.find_all("a", href=True, limit=10)
 
-            for links in div_element:
-                href_value = links['href']
-                if href_value not in seen_links:
-                    count += 1
-                    seen_links.add(href_value)
-                    data_json = Parser_html(href_value,category)
-                    if data_json["Tên bài báo: "] not in [item[0] for item in set_data]:
-                        print("chưa có file trong cơ sở dữ liệu")
-                        save_data(data_json)
-                    else:
-                        print("đã có file trong cơ sở dữ liệu")
-                    # lưu vào file json
-                    try:
-                        file = category + str(count) + ".json"
-                        with open(file, "w+", encoding="utf-8") as Json_file:
-                            json.dump(data_json, Json_file, ensure_ascii=False, indent=4)
-                            print("Đã lưu thông tin vào file ", file)
-                    except json.JSONDecodeError as e:
-                        print("Lỗi lưu vào file json.")
+        for links in div_element:
+            href_value = links['href']
+            if href_value not in seen_links:
+                count += 1
+                seen_links.add(href_value)
+                data_json = Parser_html(href_value, category)
+                if data_json["Tên bài báo: "] not in [item[0] for item in set_data]:
+                    print("chưa có file trong cơ sở dữ liệu")
+                    save_data(data_json)
+                else:
+                    print("đã có file trong cơ sở dữ liệu")
+                # lưu vào file json
+                try:
+                    file = category + str(count) + ".json"
+                    with open(file, "w+", encoding="utf-8") as Json_file:
+                        json.dump(data_json, Json_file, ensure_ascii=False, indent=4)
+                        print("Đã lưu thông tin vào file ", file)
+                except json.JSONDecodeError as e:
+                    print("Lỗi lưu vào file json.")
+
 
 def get_data_save(category):
     mydb = mysql.connector.connect(
@@ -152,13 +163,16 @@ def get_data_save(category):
     mycursor = mydb.cursor()
     sql = "SELECT title FROM crawl WHERE type = %s"
     par = (category,)
+    updatesql = "update crawl set title "
     # mycursor.execute("ALTER TABLE Crawl MODIFY COLUMN time VARCHAR(255);")
-    mycursor.execute(sql,par)
+    mycursor.execute(sql, par)
     tables = set(row for row in mycursor.fetchall())
     mydb.commit()
     mycursor.close()
     mydb.close()
     return tables
+
+
 def main():
     time_duration_minutes = 10
     time_duration_seconds = time_duration_minutes * 60
@@ -167,8 +181,9 @@ def main():
             set_data = get_data_save(category);
             count = 0
             print(set_data)
-            Cralw_html(category,url,count,set_data)
-            time.sleep(time_duration_seconds)
+            Cralw_html(category, url, count, set_data)
+
+        time.sleep(time_duration_seconds)
 
 
 if __name__ == "__main__":
